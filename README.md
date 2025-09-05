@@ -99,7 +99,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway" # reach host DB
     volumes:
-      - <WCONTAINER_WORKSPACE_HOST_DIRPATH>:/workspace
+      - <CONTAINER_WORKSPACE_HOST_DIRPATH>:/workspace
       - <CONTAINER_HOME_HOST_DIRPATH>:/home:rw   # persist all user homes
       - <CONTAINER_SSH_HOST_DIRPATH>:/root/.ssh
 
