@@ -46,7 +46,7 @@ Place them **next to the Dockerfile**. Example file names (version may vary, x86
 
 ```bash
 # Clone repo
-git clone [ttps://github.com/lwdjohari/cpp-proc-docker.git](https://github.com/lwdjohari/cpp-proc-docker.git)
+git clone https://github.com/lwdjohari/cpp-proc-docker.git
 cd cpp-proc-docker
 
 # Place the three Oracle Instant Client RPMs here
