@@ -114,6 +114,29 @@ Bring it up:
 docker compose up -d
 ```
 
+Check the logs on successful container run  
+
+```bash
+docker compose logs -f ol9proc-dev
+```
+
+Output  
+
+```
+[entrypoint] SSHD_ENABLED=true
+[entrypoint] CREATE_USER=true USER_NAME=<YOUR_USER> USER_UID=<USER_UID> USER_GID=<USER_GID> USER_SUDO=true TAKE_WORKSPACE=true
+[entrypoint] Using provided ROOT_PASSWORD (masked)
+[entrypoint] Created group name='<YOUR_USER>' gid=<USER_GID>
+[entrypoint] Created user: <YOUR_USER> (uid=<USER_UID>, gid=<USER_GID>, group='<YOUR_USER>', shell=/bin/bash)
+[entrypoint] Set password for <YOUR_USER> (masked)
+[entrypoint] Granted sudo (NOPASSWD) to <YOUR_USER>
+[entrypoint] Prepared home=/home/<YOUR_USER> (uid=<USER_UID>, gid=<USER_GID>) and SSH dir for <YOUR_USER>
+[entrypoint] Ownership of /workspace -> <USER_UID>:<USER_GID>
+[entrypoint] SSHD started on port 22
+[entrypoint] Login:
+[entrypoint]  - root: ssh -p <port> root@<host>
+[entrypoint]  - <YOUR_USER>: ssh -p <port> wvgx@<host>
+```
 
 
 ## Connecting via SSH
