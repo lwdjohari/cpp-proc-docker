@@ -40,6 +40,10 @@ Place them **next to the Dockerfile**. Example file names (version may vary, x86
 - **Precomp (Pro*C/C++)**  
   `oracle-instantclient<DBVERSION>-precomp-<VERSION>.x86_64.rpm`  
   The Pro*C/C++ precompiler (`proc`) used to convert `.pc` → `.c/.cpp`.
+  
+- **sqlplus (optional)**  
+  `oracle-instantclient-sqlplus-<VERSIOM>.x86_64.rpm`  
+  If you also want sqlplus to be available, include the SQL*Plus RPM at build time (optional).  
 
 The dockerfile is written to be ready to support any version of Oracle instant client supplied.
 ```dockerfile
