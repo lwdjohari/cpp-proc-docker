@@ -1,4 +1,4 @@
-# C, C++, and Pro*C Development Container
+# C, C++, and Pro*C/C++ Docker Development Container
 
 This container provides a **ready-to-use development environment** for:  
 - Standard **C and C++ projects**  
