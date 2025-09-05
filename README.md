@@ -5,7 +5,7 @@ This container provides a **ready-to-use development environment** for:
 - Oracle **Pro*C/C++ applications** (via Oracle Instant Client + precompiler)
 - CMAKE & GDB Ready 
 
-It’s built for developers who want a consistent workspace with modern compilers, CMake/Ninja builds, debugging tools, and Oracle database connectivity — without tedious setup.  
+It’s built for developers who want a consistent workspace with modern compilers, CMake/Ninja builds, debugging tools, and Oracle database connectivity without tedious setup.  
 
 You can develop as **root** or create a dedicated **developer user** (with its own home, sudo, and persistent workspace).
 
