@@ -2,13 +2,14 @@
 
 This container provides a **ready-to-use development environment** for:  
 - Standard **C and C++ projects**  
-- Oracle **Pro*C/C++ applications** (via Oracle Instant Client + precompiler)  
+- Oracle **Pro*C/C++ applications** (via Oracle Instant Client + precompiler)
+- CMAKE & GDB Ready 
 
 It’s built for developers who want a consistent workspace with modern compilers, CMake/Ninja builds, debugging tools, and Oracle database connectivity — without tedious setup.  
 
 You can develop as **root** or create a dedicated **developer user** (with its own home, sudo, and persistent workspace).
 
----
+
 
 ## Highlights
 
@@ -19,7 +20,7 @@ You can develop as **root** or create a dedicated **developer user** (with its o
 - **Custom dev user**: created from environment variables, UID/GID matching host, with sudo access  
 - **Remote-friendly**: SSHD enabled with password login, works with VS Code Remote SSH  
 
----
+
 
 ## Oracle Instant Client requirement
 
@@ -40,7 +41,7 @@ Place them **next to the Dockerfile**. Example file names (version may vary, x86
   `oracle-instantclient<DBVERSION>-precomp-<VERSION>.x86_64.rpm`  
   The Pro*C/C++ precompiler (`proc`) used to convert `.pc` → `.c/.cpp`.  
 
----
+
 
 ## Building the Image
 
@@ -55,7 +56,7 @@ cd cpp-proc-docker
 docker build -t proc-dev .
 ```
 
----
+
 
 ## Running with Docker Compose
 
@@ -99,7 +100,7 @@ Bring it up:
 docker compose up -d
 ```
 
----
+
 
 ## Connecting via SSH
 
@@ -117,7 +118,7 @@ If `ROOT_PASSWORD` is omitted, a random one is generated and shown in logs:
 docker logs ol9proc-dev | grep ROOT_PASSWORD
 ```
 
----
+
 
 ## VS Code Remote SSH setup
 
@@ -136,7 +137,7 @@ Host ol9proc-dev
 Then in VS Code, select **Remote-SSH: Connect to Host… → ol9proc-dev**.  
 You’ll get a full-featured development environment inside the container with your workspace at `/workspace`.
 
----
+
 
 ## Mini Hello World Pro*C Project
 
@@ -174,7 +175,7 @@ int main() {
 
 **hello_proc.c** is generated automatically by `proc` at build time.
 
----
+
 
 ### Build and run inside container
 
@@ -190,7 +191,6 @@ Expected output:
 Hello from Pro*C!
 ```
 
----
 
 ## Development workflow
 
