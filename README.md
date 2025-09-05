@@ -39,7 +39,14 @@ Place them **next to the Dockerfile**. Example file names (version may vary, x86
 
 - **Precomp (Pro*C/C++)**  
   `oracle-instantclient<DBVERSION>-precomp-<VERSION>.x86_64.rpm`  
-  The Pro*C/C++ precompiler (`proc`) used to convert `.pc` → `.c/.cpp`.  
+  The Pro*C/C++ precompiler (`proc`) used to convert `.pc` → `.c/.cpp`.
+
+The dockerfile is written to be ready to support any version of Oracle instant client supplied.
+```dockerfile
+# --- Instant Client RPMs (Basic, SDK, Precomp) ---
+ADD oracle-instantclient-*.rpm /tmp/
+RUN rpm -ivh /tmp/oracle-instantclient-*.rpm && rm -f /tmp/*.rpm
+```
 
 
 
@@ -48,12 +55,15 @@ Place them **next to the Dockerfile**. Example file names (version may vary, x86
 ```bash
 # Clone repo
 git clone https://github.com/lwdjohari/cpp-proc-docker.git
-cd cpp-proc-docker
+cd cpp-proc-docker/ol9proc
 
 # Place the three Oracle Instant Client RPMs here
 
 # Build
-docker build -t proc-dev .
+docker build -t ol9proc .
+
+# Or if you want fresh build each time with --no-cache
+docker build --no-cache -t ol9proc .
 ```
 
 
@@ -65,7 +75,7 @@ Example `docker-compose.yml`:
 ```yaml
 services:
   dev:
-    image: cpp-proc-docker:latest
+    image: ol9proc:latest
     container_name: ol9proc-dev
     environment:
       SSHD_ENABLED: "true"
