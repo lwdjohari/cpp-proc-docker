@@ -135,7 +135,7 @@ Output
 [entrypoint] SSHD started on port 22
 [entrypoint] Login:
 [entrypoint]  - root: ssh -p <port> root@<host>
-[entrypoint]  - <YOUR_USER>: ssh -p <port> wvgx@<host>
+[entrypoint]  - <YOUR_USER>: ssh -p <port> <YOUR_USER>@<host>
 ```
 
 
