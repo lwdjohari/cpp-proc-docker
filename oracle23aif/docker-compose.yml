@@ -1,0 +1,16 @@
+version: '3.8'
+name: oracle23db
+services:
+  oracledb23:
+    image: container-registry.oracle.com/database/free:latest
+    container_name: oracle23aif
+    ports:
+      - "1521:1521"   # SQL*Net
+      - "5500:5500"   # EM Express (optional)
+    environment:
+      ORACLE_PWD: CHANGE_PASSWD
+    volumes:
+      # On SELinux (Enforcing), append :Z      -> /opt/oracle/oradata:Z
+      # Change to your volume on host to make the DB persistent
+      - /mnt/data/volumes/oracle23aif:/opt/oracle/oradata
+
