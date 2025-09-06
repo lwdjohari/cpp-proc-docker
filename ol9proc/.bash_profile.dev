@@ -1,5 +1,10 @@
 # .bash_profile
 
+# -------------------------------------------------------------------
+# Modern C, C++, and Pro*C/C++ Development Docker Container with CMake & GDB
+# Author: Linggawasistha Djohari (https://github.com/lwdjohari)
+# -------------------------------------------------------------------
+
 # Get the aliases and functions
 if [ -f ~/.bashrc ]; then
         . ~/.bashrc
