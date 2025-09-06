@@ -1,0 +1,8 @@
+#include <stdio.h>
+
+EXEC SQL INCLUDE sqlca;
+
+int main() {
+    printf("Hello from Pro*C!\n");
+    return 0;
+}

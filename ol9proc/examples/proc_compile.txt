@@ -1,0 +1,14 @@
+/opt/oracle/instantclient/bin/proc \
+  iname=hello.pc oname=hello_proc.c \
+  code=ansi_c \
+  "include=(/usr/include/oracle/23/client64)" \
+  "sys_include=(/usr/lib/gcc/x86_64-redhat-linux/11/include,/usr/lib/gcc/x86_64-redhat-linux/11/include-fixed,/usr/local/include,/usr/include)" \
+  define=__x86_64__=1 define=__GNUC__=11 define=__GNUC_MINOR__=0 \
+  config=/opt/oracle/instantclient/lib/precomp/admin/pcscfg.cfg
+
+gcc -I/usr/include/oracle/23/client64 hello_proc.c \
+    -L/opt/oracle/instantclient/lib -Wl,-rpath,/opt/oracle/instantclient/lib \
+    -lclntsh -o hello_c
+
+./hello_c
+
