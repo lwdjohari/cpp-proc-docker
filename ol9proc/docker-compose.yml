@@ -1,0 +1,29 @@
+name: ol9proc-dev
+services:
+  dev:
+    image: ol9proc:latest
+    container_name: ol9proc-dev
+    environment:
+      SSHD_ENABLED: "true"           # disable if not needed
+      SSHD_PASSWORD_AUTH: "true"     # set "true" + ROOT_PASSWORD if you need password login
+      ROOT_PASSWORD: "CHANGE_PWD"    # must be set on 1st run, not yet test to change on running container
+      CREATE_USER: "true"            # must be set on 1st run, not yet test to change on running container
+      USER_NAME: "YOUR_USER"         # must be set on 1st run, not yet test to change on running container
+      USER_UID: "1000"               # must be set on 1st run, not yet test to change on running container
+      USER_GID: "1000"               # must be set on 1st run, not yet test to change on running container
+      USER_PASSWORD: "CHANGE_PWD"    # must be set on 1st run, not yet test to change on running container
+      USER_SUDO: "true"              # must be set on 1st run, not yet test to change on running container
+      TAKE_WORKSPACE: "true"         # must be set on 1st run, not yet test to change on running container
+    ports:
+      - "9000:22"                    # SSH in
+      - "9001-9010:9001-9010"        # app ports
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # reach host DB/container DB
+    volumes:
+      - /mnt/data/dev-volumes/ol9proc-dev/workspace:/workspace  # map to your host volume for workspace
+      - /mnt/data/dev-volumes/ol9proc-dev/.ssh:/root/.ssh       # DO NOT MAP TO YOUR HOST .ssh FOLDER!
+      - /mnt/data/dev-volumes/ol9proc-dev/home:/home:rw         # DO NOT MAP TO YOUR HOST /home FOLDER!
+    cap_add: [ "SYS_PTRACE" ]
+    security_opt: [ "seccomp=unconfined" ]
+    restart: unless-stopped
+

@@ -1,0 +1,131 @@
+# syntax=docker/dockerfile:1.7
+FROM oraclelinux:9
+
+# -------------------------------------------------------------------
+# Modern C, C++, and Pro*C/C++ Development Docker Container with CMake & GDB
+# Author: Linggawasistha Djohari (https://github.com/lwdjohari)
+# -------------------------------------------------------------------
+
+
+# -------------------------------------------------------------------
+# Base toolchain + libs (use BuildKit caches)
+# -------------------------------------------------------------------
+RUN --mount=type=cache,target=/var/cache/dnf \
+    --mount=type=cache,target=/var/lib/dnf \
+    dnf -y install dnf-plugins-core \
+ && dnf config-manager --set-enabled ol9_codeready_builder \
+ && dnf -y --setopt=tsflags=nodocs --setopt=install_weak_deps=False install \
+      bash gcc gcc-c++ clang llvm cmake ninja-build git unzip \
+      tar gzip xz bzip2 tree openssl-devel openssl \
+      pkgconf-pkg-config uuid-devel \
+      libaio libuv-devel zlib-devel vim nano \
+      openssh-server openssh-clients sudo which \
+      gdb gdb-gdbserver hostname gnupg2 pinentry pinentry-tty \
+ && dnf clean all \
+ && rm -rf /var/tmp/* /tmp/*
+
+# -------------------------------------------------------------------
+# Oracle Instant Client (Basic, SDK, Precompiler -> proc)
+# Place the RPMs next to the Dockerfile before build.
+# -------------------------------------------------------------------
+ADD oracle-instantclient-*.rpm /tmp/
+RUN rpm -ivh /tmp/oracle-instantclient-*.rpm && rm -f /tmp/*.rpm
+
+# Create a stable /opt/oracle/instantclient symlink (safe + idempotent)
+RUN set -e; \
+  mkdir -p /opt/oracle; \
+  candidates="$(ls -d /usr/lib/oracle/*/client64 2>/dev/null || true)"; \
+  if [ -z "$candidates" ]; then \
+    echo "ERROR: No Oracle Instant Client found under /usr/lib/oracle/*/client64"; \
+    ls -al /usr/lib/oracle || true; exit 1; \
+  fi; \
+  IC_DIR="$(printf '%s\n' $candidates | sort -V | tail -n1)"; \
+  if [ ! -e /opt/oracle/instantclient ]; then \
+    ln -s "$IC_DIR" /opt/oracle/instantclient; \
+    echo "Created symlink /opt/oracle/instantclient -> $IC_DIR"; \
+  else \
+    echo "/opt/oracle/instantclient already exists, skipping symlink"; \
+  fi
+  
+# Stable ORACLE_HOME + env
+RUN ln -s /usr/lib/oracle/*/client64 /opt/oracle/instantclient || true
+ENV ORACLE_HOME=/opt/oracle/instantclient
+ENV LD_LIBRARY_PATH=$ORACLE_HOME/lib:$ORACLE_HOME
+# ENV CPATH=$ORACLE_HOME/precomp/public:$ORACLE_HOME/sdk/include
+ENV PATH=$ORACLE_HOME/bin:$PATH
+
+# System-wide Oracle profile (so SSH login shells get env automatically)
+RUN printf '%s\n' \
+'export ORACLE_HOME=/opt/oracle/instantclient' \
+'export LD_LIBRARY_PATH="$ORACLE_HOME/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"' \
+# 'export CPATH="$ORACLE_HOME/precomp/public:$ORACLE_HOME/sdk/include${CPATH:+:$CPATH}"' \
+'export PATH="$ORACLE_HOME/bin:$PATH"' \
+> /etc/profile.d/10-oracle.sh && chmod 0644 /etc/profile.d/10-oracle.sh
+
+# -------------------------------------------------------------------
+# Catch2 v3 (header-only + CMake package)
+# -------------------------------------------------------------------
+RUN git clone --depth=1 -b v3.5.0 https://github.com/catchorg/Catch2.git /tmp/Catch2 \
+ && cmake -S /tmp/Catch2 -B /tmp/Catch2/build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
+ && cmake --build /tmp/Catch2/build --target install \
+ && rm -rf /tmp/Catch2
+
+# -------------------------------------------------------------------
+# Sanity (non-fatal)
+# -------------------------------------------------------------------
+RUN proc -version || true
+RUN tar --version  || true
+RUN pkg-config --modversion libuv || true
+
+# -------------------------------------------------------------------
+# SSH (runtime toggle) — variables:
+#   - SSHD_ENABLED:        true|false (default: false)
+#   - SSHD_PASSWORD_AUTH:  true|false (default: false) — requires ROOT_PASSWORD
+#   - ROOT_PASSWORD:       (string)   — only used if SSHD_PASSWORD_AUTH=true
+# -------------------------------------------------------------------
+ENV SSHD_ENABLED=false
+ENV SSHD_PASSWORD_AUTH=false
+
+# Hardening defaults; entrypoint will adjust at runtime as requested
+RUN mkdir -p /run/sshd \
+ && sed -ri 's/^#?PasswordAuthentication .*/PasswordAuthentication no/' /etc/ssh/sshd_config \
+ && sed -ri 's/^#?PermitRootLogin .*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config \
+ && echo 'ClientAliveInterval 60' >>/etc/ssh/sshd_config \
+ && echo 'ClientAliveCountMax  3'  >>/etc/ssh/sshd_config
+
+# Copy the entrypoint script (separate file) and ensure LF + executable
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh && chmod +x /usr/local/bin/entrypoint.sh
+
+# -------------------------------------------------------------------
+# Volumes & working dir
+# -------------------------------------------------------------------
+RUN mkdir -p /root/.ssh && chmod 700 /root/.ssh
+WORKDIR /workspace
+VOLUME ["/workspace", "/root/.ssh"]
+
+# -------------------------------------------------------------------
+# Expose ports (metadata; actual host mapping via run/compose)
+# 22         : SSH
+# 9001-9010  : example app ports
+# -------------------------------------------------------------------
+EXPOSE 22
+EXPOSE 9001-9010
+
+# -------------------------------------------------------------------
+# Copy rich bash profiles into /etc/skel (applied to new users)
+# Also apply to root by default
+# -------------------------------------------------------------------
+COPY .bashrc.dev /etc/skel/.bashrc
+COPY .bash_profile.dev /etc/skel/.bash_profile
+
+COPY .bashrc.dev /root/.bashrc
+COPY .bash_profile.dev /root/.bash_profile
+
+
+# -------------------------------------------------------------------
+# Default entrypoint & cmd (keep container alive)
+# -------------------------------------------------------------------
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["sleep", "infinity"]
+
