@@ -1,0 +1,63 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+EXEC SQL INCLUDE sqlca;
+
+/* Simple error handler: print code/message, rollback, and exit */
+static void sqlerr(const char *where) {
+    fprintf(stderr,
+            "[SQLERROR] at %s: sqlcode=%ld, sqlerrm=\"%.*s\"\n",
+            where,
+            (long)sqlca.sqlcode,
+            (int)sqlca.sqlerrm.sqlerrml,
+            sqlca.sqlerrm.sqlerrmc);
+    EXEC SQL ROLLBACK RELEASE;
+    exit(1);
+}
+
+int main(void) {
+    EXEC SQL BEGIN DECLARE SECTION;
+      char username[32], password[32];
+      char db[128] = "//host.docker.internal:1521/FREEPDB1";  /* change this to your DB Host and port */
+      int  emp_id = 101;
+      VARCHAR emp_name[65]; /* len: ushort, arr[] */
+      double  salary;
+    EXEC SQL END DECLARE SECTION;
+
+    /* Fail fast if creds not provided */
+    const char *u = getenv("PROC_DB_USER");
+    const char *p = getenv("PROC_DB_PASS");
+    if (!u || !p) {
+        fprintf(stderr, "Set PROC_DB_USER and PROC_DB_PASS in the environment.\n");
+        return 2;
+    }
+    snprintf(username, sizeof username, "%s", u);
+    snprintf(password, sizeof password, "%s", p);
+
+    /* Error policy: on any SQLERROR, call sqlerr(); if no row, jump to no_row */
+    EXEC SQL WHENEVER SQLERROR DO sqlerr("CONNECT/QUERY");
+    EXEC SQL WHENEVER NOT FOUND GOTO no_row;
+
+    /* Connect */
+    EXEC SQL CONNECT :username IDENTIFIED BY :password USING :db;
+
+    /* Query*/
+    EXEC SQL SELECT name, sal
+               INTO :emp_name, :salary
+               FROM employees
+              WHERE id = :emp_id;
+
+    /* Safe print: %.*s uses precision = len (auto-promoted to int) */
+    printf("Employee: %.*s | Salary: %.2f\n", emp_name.len, emp_name.arr, salary);
+
+    /* Clean exit */
+    EXEC SQL COMMIT WORK RELEASE;
+    return 0;
+
+no_row:
+    /* Handle 1403 (no data found) without treating it as an error */
+    fprintf(stderr, "No employee found for id=%d.\n", emp_id);
+    EXEC SQL COMMIT WORK RELEASE;
+    return 1;
+}
+
