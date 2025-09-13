@@ -1,3 +1,6 @@
+# NOTE: THIS IS DEV CONTAINER! NOT PRODUCTION CONTAINER
+# Use only for development, all configs are adjusted to be dev env pre-requisites.
+
 name: ol9proc-dev
 services:
   dev:
@@ -18,11 +21,14 @@ services:
       - "9000:22"                    # SSH in
       - "9001-9010:9001-9010"        # app ports
     extra_hosts:
+      # We can easily access the DB Container in host or in another docker container 
       - "host.docker.internal:host-gateway" # reach host DB/container DB
     volumes:
       - /mnt/data/dev-volumes/ol9proc-dev/workspace:/workspace  # map to your host volume for workspace
       - /mnt/data/dev-volumes/ol9proc-dev/.ssh:/root/.ssh       # DO NOT MAP TO YOUR HOST .ssh FOLDER!
       - /mnt/data/dev-volumes/ol9proc-dev/home:/home:rw         # DO NOT MAP TO YOUR HOST /home FOLDER!
+  
+    # dev-only caps for enabling gdb native debug in this container; do not “fix”!
     cap_add: [ "SYS_PTRACE" ]
     security_opt: [ "seccomp=unconfined" ]
     restart: unless-stopped
