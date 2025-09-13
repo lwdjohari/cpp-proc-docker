@@ -311,9 +311,22 @@ persistent volume docker container for Oracle 23ai.
   docker logs -f oracle23aif
   ```
   
-  You will find log showing if DB password has been altered successfully and  
-  no more DB NULL Password in log anymore.  
+  You will find log showing if DB password has been altered successfully and no more DB NULL Password in log anymore.  
 - Now you can connect sqlplus or any db admin gui to
+    
+  From another Dev Container (eg: ol9proc-dev)
   ```
-  system@localhost:1521
+  sqlplus user/pass@//host.docker.internal:1521/FREEPDB1
+  ```
+    
+  You must enable option in your docker-compose.yaml to be able for dev container connect to your Oracle DB Container.
+     
+  ```yaml
+  extra_hosts:
+  - "host.docker.internal:host-gateway"
+  ```
+    
+  If you are connecting from inside Oracle DB Container, use this command  
+  ```
+  sqlplus user/pass@//localhost:1521/FREEPDB1
   ```
