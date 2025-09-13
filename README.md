@@ -284,4 +284,36 @@ Hello from Pro*C!
 - Place code in `/workspace` (bind-mounted from host).  
 - For normal C/C++: use CMake + Ninja with GCC or Clang.  
 - For Pro*C: run `proc` via CMake custom commands.  
-- Debug with GDB or VS Code Remote SSH.  
+- Debug with GDB or VS Code Remote SSH.
+
+## Oracle23ai Docker Container Setup
+You will need working Oracle 23ai db to work on Pro*C/C++.    
+I have prepare docker compose file to prepare working container and   
+persistent volume docker container for Oracle 23ai.  
+  
+- Goto folder `oracle23aif`
+- Modify docker-compose.yaml to your docker configurations
+- Run with command
+   ```bash
+  docker compose up -d
+  ```
+     
+  When container first run you will find error in your log about DB NULL Password,  
+  don't worry you just have to change password as per your docker-compose.yaml.
+  
+- After container is run, execute
+  ```bash
+  docker exec oracle23aif ./setpassword.sh <YOUR_PASSWD_IN_DOCKER_COMPOSE>
+  ```
+  Verified the container log if the password has been changed sucessfully.
+- Open container log using
+  ```bash
+  docker logs -f oracle23aif
+  ```
+  
+  You will find log showing if DB password has been altered successfully and  
+  no more DB NULL Password in log anymore.  
+- Now you can connect sqlplus or any db admin gui to
+  ```
+  system@localhost:1521
+  ```
