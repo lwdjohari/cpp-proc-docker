@@ -9,6 +9,25 @@ It’s built for developers who want a consistent workspace with modern compiler
 
 You can develop as **root** or create a dedicated **developer user** (with its own home, sudo, and persistent workspace).
 
+## Why this exists  
+
+Getting **Pro C/C++, C, or C++** running cleanly on a modern system can be a slog:  
+- Oracle Instant Client RPMs in the right place  
+- Header paths, linker flags, and library quirks  
+- Wiring **CMake** toolchains and **Ninja** builds without breaking something  
+
+All of that just to see “Hello, world” compile.  
+
+This container cuts straight through the noise:  
+- **GCC, Clang, CMake, and Ninja** are preinstalled and ready  
+- Oracle client and `proc` are already wired into the build flow  
+- Example CMake config shows the pattern, you can expand it as you like  
+
+It’s a **Development Container** (not a Production Container). Perfect if you:  
+- Already know these languages and want it to *just work out of the box*  
+- Or you’re learning Pro C/C++, C, or C++ but don’t have time to build the environment yourself  
+
+Mount your code, run CMake, and get back to coding.  
 
 
 ## Highlights
