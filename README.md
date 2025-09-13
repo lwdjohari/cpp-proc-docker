@@ -9,6 +9,20 @@ It’s built for developers who want a consistent workspace with modern compiler
 
 You can develop as **root** or create a dedicated **developer user** (with its own home, sudo, and persistent workspace).
 
+## Table of Contents
+- [C, C++, and Pro\*C/C++ Docker Development Container](#c-c-and-procc-docker-development-container)
+  - [Why this exists](#why-this-exists)
+  - [Highlights of ol9proc Dev Image](#highlights)
+  - [Oracle Instant Client requirement](#oracle-instant-client-requirement)
+  - [Building the ol9proc Image (Dev Image)](#building-the-image)
+  - [Running with Docker Compose for ol9proc-dev Container](#running-with-docker-compose)
+  - [Connecting to ol9proc-dev Container via SSH](#connecting-via-ssh)
+  - [VS Code Remote SSH setup](#vs-code-remote-ssh-setup)
+  - [Mini Hello World Pro\*C Project](#mini-hello-world-proc-project)
+    - [Build and run inside container](#build-and-run-inside-container)
+  - [Development workflow](#development-workflow)
+  - [Oracle23ai DB Docker Container Setup](#oracle23ai-docker-container-setup)
+
 ## Why this exists  
 
 Getting **Pro C/C++, C, or C++** running cleanly on a modern system can be a slog:  
