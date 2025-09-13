@@ -316,21 +316,57 @@ persistent volume docker container for Oracle 23ai.
    ```bash
   docker compose up -d
   ```
-     
-  When container first run you will find error in your log about DB NULL Password,  
-  don't worry you just have to change password as per your docker-compose.yaml.
   
-- After container is run, execute
-  ```bash
-  docker exec oracle23aif ./setPassword.sh <YOUR_PASSWD_IN_DOCKER_COMPOSE>
-  ```
-  Verified the container log if the password has been changed sucessfully.
 - Open container log using
   ```bash
   docker logs -f oracle23aif
   ```
+   
+   
+  If you found error `DB NULL PASSWORD` change the password using `docker exec oracle23aif ./setPassword.sh <PASSWORD>` command.  
+  Note: change the password as per your docker-compose.yaml.
+     
+    
+   If you found error creating DB inside container log
+  ```
+  Prepare for db operation
+  Cannot create directory "/opt/oracle/oradata/FREE".
+  ```
+  Execute this command, and restart the container
+  ```bash
   
-  You will find log showing if DB password has been altered successfully and no more DB NULL Password in log anymore.  
+  # Make it owned by the oracle user used in the image
+  sudo chown -R 54321:54321 <HOST_MAP_VOLUME_PATH>/oracle23aif
+  sudo chmod -R 775 <HOST_MAP_VOLUME_PATH>/oracle23aif
+  docker container stop oracle23aif
+  docker container start oracle23aif
+  ```
+  Check the log container, make sure the `oradata` can be written
+  ```
+  Prepare for db operation
+  7% complete
+  Copying database files
+  29% complete
+  Creating and starting Oracle instance
+  43% complete
+  Completing Database Creation
+  50% complete
+  Creating Pluggable Databases
+  71% complete
+  Executing Post Configuration Actions
+  93% complete
+  Running Custom Scripts
+  100% complete
+  Database creation complete. For details check the logfiles at:
+   /opt/oracle/cfgtoollogs/dbca/FREE.
+  ```
+
+    
+- If you are encountered error `DB NULL PASSWORD` or want to change the DB Password after container is run, execute
+  ```bash
+  docker exec oracle23aif ./setPassword.sh <YOUR_PASSWD_IN_DOCKER_COMPOSE>
+  ```
+  Verified the container log if the password has been changed successfully.
 - Connect sqlplus or any db admin gui to the Oracle 23ai DB Container
     
   From another Dev Container (eg: ol9proc-dev)
@@ -349,3 +385,6 @@ persistent volume docker container for Oracle 23ai.
   ```
   sqlplus user/pass@//localhost:1521/FREEPDB1
   ```
+
+
+  
