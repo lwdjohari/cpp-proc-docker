@@ -312,7 +312,7 @@ persistent volume docker container for Oracle 23ai.
   ```
   
   You will find log showing if DB password has been altered successfully and no more DB NULL Password in log anymore.  
-- Now you can connect sqlplus or any db admin gui to
+- Connect sqlplus or any db admin gui to the Oracle 23ai DB Container
     
   From another Dev Container (eg: ol9proc-dev)
   ```
