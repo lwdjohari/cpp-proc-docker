@@ -303,7 +303,7 @@ persistent volume docker container for Oracle 23ai.
   
 - After container is run, execute
   ```bash
-  docker exec oracle23aif ./setpassword.sh <YOUR_PASSWD_IN_DOCKER_COMPOSE>
+  docker exec oracle23aif ./setPassword.sh <YOUR_PASSWD_IN_DOCKER_COMPOSE>
   ```
   Verified the container log if the password has been changed sucessfully.
 - Open container log using
