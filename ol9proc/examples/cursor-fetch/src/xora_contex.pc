@@ -1,0 +1,144 @@
+#define SQLCA_STORAGE_CLASS extern
+EXEC SQL INCLUDE sqlca;
+
+#include "xora_proc_contex.h"  /* struct xora_conn { sql_context ctx; VARCHAR user[64]; ... } */
+#include "xora_proc_helper.h"  /* xora_ora_ok, xora_utf8_set_varchar, etc. */
+
+#include "xora_error.h"
+#include "xora_alloc.h"
+#include "xora_contex.h"
+
+/* Create a disconnected handle (alloc + context allocate) */
+xora_err_t xora_conn_create(xora_conn_t **out,
+                            const char *user,
+                            const char *pass,
+                            const char *db)
+{
+    if (!out || *out) return XORA_ALREADY_ALLOCATED;
+
+    xora_conn_t *h = (xora_conn_t *)xora_malloc(sizeof(*h));
+    memset(h, 0, sizeof(*h));
+    h->broken = 1; /* not open yet */
+
+    /* Prepare credentials (into handle’s VARCHARs) */
+    xora_ut8_copy_bounded(h->user, user, sizeof(h->user));
+    xora_ut8_copy_bounded(h->pass, pass, sizeof(h->pass));
+    xora_ut8_copy_bounded(h->db, db,  sizeof(h->db));
+
+    /* Allocate a separate SQL context (per-handle/per-thread) */
+    EXEC SQL BEGIN DECLARE SECTION;
+      sql_context lctx;
+    EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT ALLOCATE :lctx;
+    if (!xora_ora_ok("context_allocate")) {
+        xora_free(h);
+        return XORA_ALLOCATION_FAILED;
+    }
+    h->ctx = lctx;
+
+    *out = h;
+    return XORA_OK;
+}
+
+/* Open a session for this handle */
+xora_err_t xora_conn_open(xora_conn_t *h)
+{
+    if (!h) return XORA_CONN_ERR;
+
+    EXEC SQL BEGIN DECLARE SECTION;
+      sql_context lctx;
+      char u[32];
+      char p[32];
+      char d[128];
+    EXEC SQL END DECLARE SECTION;
+
+    /* Copy from handle into local host vars */
+    lctx = h->ctx;
+    // u = h->user;  /* struct assignment is fine */
+    // p = h->pass;
+    // d = h->db;
+
+    memcpy(&u, &h->user, sizeof(u));
+    memcpy(&p, &h->pass, sizeof(p));
+    memcpy(&d, &h->db,   sizeof(d));
+
+    EXEC SQL CONTEXT USE :lctx;
+
+    EXEC SQL CONNECT :u IDENTIFIED BY :p USING :d;
+    if (!xora_ora_ok("connect")) {
+        h->broken = 1;
+        return XORA_CONN_ERR;
+    }
+
+    h->ctx = lctx; /* same context; keep explicit */
+    h->broken = 0;
+    return XORA_CONN_OPEN_OK;
+}
+
+/* Probe liveness with a cheap SELECT 1 FROM DUAL */
+xora_err_t xora_conn_is_open(xora_conn_t *h)
+{
+    if (!h || h->broken) return XORA_CONN_CLOSED;
+
+    EXEC SQL BEGIN DECLARE SECTION;
+      sql_context lctx;
+      int v_probe;
+    EXEC SQL END DECLARE SECTION;
+
+    lctx = h->ctx;
+
+    EXEC SQL CONTEXT USE :lctx;
+    EXEC SQL SELECT 1 INTO :v_probe FROM DUAL;
+    if (sqlca.sqlcode < 0) return XORA_CONN_ERR;
+
+    return (v_probe == 1) ? XORA_CONN_OPEN_OK : XORA_CONN_ERR;
+}
+
+/* Close session; keep context allocated for possible reopen */
+void xora_conn_close(xora_conn_t *h)
+{
+    if (!h || h->broken) return;
+
+    EXEC SQL BEGIN DECLARE SECTION;
+      sql_context lctx;
+    EXEC SQL END DECLARE SECTION;
+
+    lctx = h->ctx;
+
+    EXEC SQL CONTEXT USE :lctx;
+    EXEC SQL COMMIT WORK RELEASE;
+
+    /* If release fails, still mark broken to avoid reuse */
+    h->broken = 1;
+}
+
+/* Free the handle and its context */
+void xora_conn_destroy(xora_conn_t **hptr)
+{
+    if (!hptr || !*hptr) return;
+    xora_conn_t *h = *hptr;
+
+    /* Best-effort close if still open */
+    if (!h->broken) {
+        EXEC SQL BEGIN DECLARE SECTION;
+          sql_context lctx;
+        EXEC SQL END DECLARE SECTION;
+
+        lctx = h->ctx;
+        EXEC SQL CONTEXT USE :lctx;
+        EXEC SQL COMMIT WORK RELEASE;
+        h->broken = 1;
+    }
+
+    /* Free Pro*C context */
+    EXEC SQL BEGIN DECLARE SECTION;
+      sql_context lctx2;
+    EXEC SQL END DECLARE SECTION;
+
+    lctx2 = h->ctx;
+    EXEC SQL CONTEXT FREE :lctx2;
+
+    xora_free(h);
+    *hptr = NULL;
+}
