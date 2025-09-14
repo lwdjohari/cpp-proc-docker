@@ -17,7 +17,7 @@ include(procgen)
 # ---- Include paths for compiled C (public headers) ----
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/inc
-  ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/stb/inc
+  ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/stb/inc
   ${ORA_INC}  # for <sqlca.h>
 )
 
@@ -38,7 +38,7 @@ set(XORA_PC_SOURCES
 
 # Project include dirs for Pro*C (semicolon-separated)
 set(XORA_PC_INCLUDES
-  "${CMAKE_CURRENT_SOURCE_DIR}/inc; ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/stb/inc")
+  "${CMAKE_CURRENT_SOURCE_DIR}/inc; ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/stb/inc/")
 
 # ---- Precompile .pc → .c ----
 set(XORA_GENERATED_C_SOURCES "")
@@ -55,7 +55,7 @@ add_library(xora_db STATIC ${XORA_GENERATED_C_SOURCES})
 target_include_directories(xora_db 
     PUBLIC 
         ${CMAKE_CURRENT_SOURCE_DIR}/inc
-        ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/stb/inc
+        ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/stb/inc
         {ORA_INC}  # for <sqlca.h>
 )
 # if (XORA_OCI_LIBS)
