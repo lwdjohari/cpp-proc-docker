@@ -25,6 +25,7 @@ include_directories(
 set(XORA_PC_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/xora_contex.pc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/xora_proc_emp_fetch.pc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/xora_proc_emp_fvect.pc
 )
 
 # Guardrail: ensure each .pc includes the proc aggregator you use

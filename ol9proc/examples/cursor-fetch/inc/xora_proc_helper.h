@@ -19,12 +19,29 @@ extern "C"
 
   /* ---- sqlca helpers (read-only) ---- */
 
-#define XORA_ORA_BREAK_ON_NODATA() \
-  do                               \
-  {                                \
-    if (sqlca.sqlcode == 1403)     \
-      break;                       \
+#define XORA_ORA_BREAK_ON_NODATA()                     \
+  do                                                   \
+  {                                                    \
+    if (sqlca.sqlcode == 1403 || sqlca.sqlcode == 100) \
+      break;                                           \
   } while (0)
+
+  /* Error only (sqlcode < 0) */
+#define XORA_ORA_OK(step)                                                               \
+  ((sqlca.sqlcode < 0) ? (fprintf(stderr, "[ORA-ERR] step=%s code=%ld msg=%.*s\n",      \
+                                  (step), (long)sqlca.sqlcode,                          \
+                                  (int)sqlca.sqlerrm.sqlerrml, sqlca.sqlerrm.sqlerrmc), \
+                          0)                                                            \
+                       : 1)
+
+/* Error and Warning (sqlcode != 0) */
+#define XORA_ORA_OK_STRICT(step)                                                         \
+  ((sqlca.sqlcode != 0) ? (fprintf(stderr, "[ORA-%s] step=%s code=%ld msg=%.*s\n",       \
+                                   (sqlca.sqlcode < 0 ? "ERR" : "WARN"),                 \
+                                   (step), (long)sqlca.sqlcode,                          \
+                                   (int)sqlca.sqlerrm.sqlerrml, sqlca.sqlerrm.sqlerrmc), \
+                           0)                                                            \
+                        : 1)
 
   static inline int xora_ora_ok(const char *step)
   {

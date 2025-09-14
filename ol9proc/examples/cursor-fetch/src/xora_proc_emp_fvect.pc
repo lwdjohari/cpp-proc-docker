@@ -1,0 +1,160 @@
+/* xora_proc_emp_fvect.pc
+ *
+ * Implementations of cursor batch array with stb_ds vector imol
+ * Notes:
+ *  - Uses sqlca.sqlerrd[2] (cumulative rows processed) to compute per-batch rows.
+ *  - Stops when cap reached or NO DATA FOUND (sqlcode 1403).
+ *  - Preserves your context usage pattern.
+ */
+
+#define SQLCA_STORAGE_CLASS extern
+EXEC SQL INCLUDE sqlca;
+
+/* Make Pro*C continue after errors/warnings so we can read sqlca */
+
+#define STB_DS_IMPLEMENTATION
+#include "stb_ds.h"
+
+#include "xora_proc_contex.h"
+#include "xora_proc_helper.h" /* xora_ora_ok(...), xora_utf8_set_varchar(...) etc. */
+
+#include <stdlib.h>
+#include <string.h>
+
+/* Your project headers (as per your earlier snippet) */
+#include "xora_error.h" /* xora_err_t, XORA_OK / XORA_ERR */
+#include "xora_alloc.h"
+#include "xora_contex.h"
+
+#include "xora_proc_emp.h" /* xora_emp_row_t, prototypes */
+#include "xora_proc_emp_fetch.h"
+
+#ifndef XORA_MAX_BATCH
+#define XORA_MAX_BATCH 1024 /* hard ceiling for stack arrays */
+#endif
+
+/* Fetch ALL rows into a growable stb_ds vector. No batching, no throttling. */
+xora_err_t xora_emp_fetch_vect(xora_conn_t *h,
+                               xora_emp_row_t **rows,
+                               int reserve_hint)
+{
+
+  if (!h || !rows)
+    return XORA_ERR;
+
+  /* Save current length so we can rollback on error */
+  // const int base_len = arrlen(rows);
+
+  xora_emp_row_t *vec = *rows;
+  int base_len = arrlen(vec);
+  if (reserve_hint > 0)
+  {
+    arrsetcap(vec, base_len + reserve_hint);
+  }
+
+  EXEC SQL BEGIN DECLARE SECTION;
+  sql_context lctx;
+  EXEC SQL END DECLARE SECTION;
+
+  EXEC SQL CONTEXT ALLOCATE : lctx;
+  lctx = h->ctx;
+  EXEC SQL CONTEXT USE : h->ctx;
+
+  EXEC SQL DECLARE emp1_cur CURSOR FOR
+      SELECT id,
+      name, sal FROM employees;
+
+  /* Host arrays MUST have compile-time size */
+  EXEC SQL BEGIN DECLARE SECTION;
+  int empno_arr[512];
+  char ename_arr[512][51];
+  float sal_arr[512];
+  short ename_ind_arr[512];
+  EXEC SQL END DECLARE SECTION;
+
+  EXEC SQL OPEN emp1_cur;
+  if (!XORA_ORA_OK("OPEN emp1_cur"))
+  {
+    goto sql_err;
+  }
+  long prev_fetch_total = 0;
+  int row_processed = 0;
+  long fetch_total = 0;
+  int next_processing = 0;
+  int pass = 0;
+  for (;;)
+  {
+
+    /* Plain FETCH; Pro*C fills up to the array bound or until no more rows. */
+    EXEC SQL FETCH emp1_cur
+        INTO
+        : empno_arr,
+        : ename_arr INDICATOR : ename_ind_arr,
+        : sal_arr;
+
+    XORA_ORA_BREAK_ON_NODATA();
+    
+    /* Cumulative counter this fetch */
+    fetch_total = sqlca.sqlerrd[2];
+    row_processed = (int)(fetch_total - prev_fetch_total);
+
+    /* Guard: if cumulative didn't increase, we're done */
+    if (row_processed <= 0)
+    {
+      printf("[pass-%d] row_processed=0 total=%ld (no progress → tail/EOF)\n\n",
+             pass, prev_fetch_total);
+      break;
+    }
+
+    /* Check for error */
+    if (!XORA_ORA_OK("FETCH emp1_cur"))
+    {
+      goto sql_err;
+    }
+
+    /* Cap limit */
+    next_processing = (row_processed < 512) ? row_processed : 512;
+
+    printf("[pass-%d] row_processed=%d next_processing=%d total(next)=%ld\n",
+           pass, row_processed, next_processing, prev_fetch_total + row_processed);
+    if (next_processing == 0)
+      break;
+
+    /* stb_ds: grow only if needed */
+    if (arrcap(vec) < arrlen(vec) + next_processing)
+    {
+      arrsetcap(vec, arrlen(vec) + next_processing);
+    }
+
+    // printf("fetch_total[%ld]  prev_fetch_total[%ld] row_processed[%d] next_processing[%d]\n", fetch_total, prev_fetch_total, prev_fetch_total, next_processing);
+
+    for (int i = 0; i < next_processing; ++i)
+    {
+
+      xora_emp_row_t row;
+      row.empno = empno_arr[i];
+      row.salary = sal_arr[i];
+      row.ename_is_null = (ename_ind_arr[i] < 0);
+      xora_ut8_copy_bounded(row.ename, ename_arr[i], sizeof(row.ename));
+      arrpush(vec, row);
+
+      // printf("%-6d  %-50s  %10.2f\n", empno_arr[i], ename_arr[i], sal_arr[i]);
+    }
+
+    prev_fetch_total += row_processed;
+    ++pass;
+  }
+
+  EXEC SQL CLOSE emp1_cur;
+  *rows = vec;
+  return XORA_OK;
+
+sql_err:
+  /* cleanup if needed, then bubble up */
+  /* If cursor might still be open, try to close it: */
+  EXEC SQL CLOSE emp1_cur;
+  /* stb_ds: rollback to base length */
+  arrsetlen(vec, base_len);
+  *rows = vec;
+  return XORA_ERR;
+}

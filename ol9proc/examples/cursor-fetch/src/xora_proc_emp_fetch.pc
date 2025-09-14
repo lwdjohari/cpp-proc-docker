@@ -1,25 +1,21 @@
 /* xora_proc_emp_fetch.pc
  *
- * Two helpers:
- *   - xora_emp_fetch_stack(): stack arrays (bounded by XORA_MAX_BATCH)
- *   - xora_emp_fetch_heap():  heap arrays (EXEC SQL VAR ... ARRAY[..])
- * Wrapper:
- *   - xora_emp_fetch(): picks stack if batch_size <= XORA_MAX_BATCH, else heap.
- *
  * Notes:
  *  - Uses sqlca.sqlerrd[2] (cumulative rows processed) to compute per-batch rows.
  *  - Stops when cap reached or NO DATA FOUND (sqlcode 1403).
  *  - Preserves your context usage pattern.
  */
 
-
 #define SQLCA_STORAGE_CLASS extern
 EXEC SQL INCLUDE sqlca;
 
 /* Make Pro*C continue after errors/warnings so we can read sqlca */
-EXEC SQL WHENEVER SQLERROR   CONTINUE;
-EXEC SQL WHENEVER SQLWARNING CONTINUE;
-EXEC SQL WHENEVER NOT FOUND  CONTINUE;
+// EXEC SQL WHENEVER SQLERROR   CONTINUE;
+// EXEC SQL WHENEVER SQLWARNING CONTINUE;
+// EXEC SQL WHENEVER NOT FOUND  CONTINUE;
+
+// #define STB_DS_IMPLEMENTATION
+// #include "stb_ds.h"
 
 #include "xora_proc_contex.h"
 #include "xora_proc_helper.h" /* xora_ora_ok(...), xora_utf8_set_varchar(...) etc. */
@@ -28,100 +24,106 @@ EXEC SQL WHENEVER NOT FOUND  CONTINUE;
 #include <string.h>
 
 /* Your project headers (as per your earlier snippet) */
-#include "xora_error.h"      /* xora_err_t, XORA_OK / XORA_ERR */
+#include "xora_error.h" /* xora_err_t, XORA_OK / XORA_ERR */
 #include "xora_alloc.h"
 #include "xora_contex.h"
 
 #include "xora_proc_emp.h" /* xora_emp_row_t, prototypes */
-#include "xora_proc_emp_fetch.h" 
-
+#include "xora_proc_emp_fetch.h"
 
 #ifndef XORA_MAX_BATCH
-#define XORA_MAX_BATCH 1024  /* hard ceiling for stack arrays */
+#define XORA_MAX_BATCH 1024 /* hard ceiling for stack arrays */
 #endif
 
 
 
-
 //* Fetch loop using only stack arrays (compile-time bound) */
-xora_err_t xora_emp_fetch(xora_conn_t *h,
+xora_err_t xora_emp_fetch_arrst(xora_conn_t *h,
                                 xora_emp_row_t *rows,
                                 int cap,
                                 int *out_count,
                                 int batch_size)
 {
-  if (!h || !rows || !out_count || cap <= 0) return XORA_ERR;
-  if (batch_size <= 0) batch_size = XORA_MAX_BATCH;           /* default */
-  if (batch_size > XORA_MAX_BATCH) batch_size = XORA_MAX_BATCH;/* clamp */
+  if (!h || !rows || !out_count || cap <= 0)
+    return XORA_ERR;
+  if (batch_size <= 0)
+    batch_size = XORA_MAX_BATCH; /* default */
+  if (batch_size > XORA_MAX_BATCH)
+    batch_size = XORA_MAX_BATCH; /* clamp */
   *out_count = 0;
 
   EXEC SQL BEGIN DECLARE SECTION;
-    sql_context lctx;
+  sql_context lctx;
   EXEC SQL END DECLARE SECTION;
 
-  EXEC SQL CONTEXT ALLOCATE :lctx;
+  EXEC SQL CONTEXT ALLOCATE : lctx;
   lctx = h->ctx;
-  EXEC SQL CONTEXT USE :h->ctx;
+  EXEC SQL CONTEXT USE : h->ctx;
 
-  EXEC SQL DECLARE emp_cur CURSOR FOR
-      SELECT id, name, sal
-        FROM scott.employees;
+  EXEC SQL DECLARE emp1_cur CURSOR FOR
+      SELECT id,
+      name, sal FROM scott.employees;
 
   /* Host arrays MUST have compile-time size */
   EXEC SQL BEGIN DECLARE SECTION;
-    int   empno_arr[1024];
-    char  ename_arr[1024][51];
-    float sal_arr[1024];
-    short ename_ind_arr[1024];
+  int empno_arr[512];
+  char ename_arr[512][51];
+  float sal_arr[512];
+  short ename_ind_arr[512];
   EXEC SQL END DECLARE SECTION;
 
-  EXEC SQL OPEN emp_cur;
-  if (!xora_ora_ok("OPEN emp_cur")) {
+  EXEC SQL OPEN emp1_cur;
+  if (!xora_ora_ok("OPEN emp1_cur"))
+  {
     goto sql_err;
   }
   long prev_total = 0;
 
-  for (;;) {
+  for (;;)
+  {
     /* Plain FETCH; Pro*C fills up to the array bound or until no more rows. */
-    EXEC SQL FETCH emp_cur
-         INTO :empno_arr,
-              :ename_arr INDICATOR :ename_ind_arr,
-              :sal_arr;
+    EXEC SQL FETCH emp1_cur
+        INTO : empno_arr,
+        : ename_arr INDICATOR : ename_ind_arr,
+        : sal_arr;
 
     
-    XORA_ORA_BREAK_ON_NODATA();
-    if (!xora_ora_ok("FETCH emp_cur")) {
+    if (!XORA_ORA_OK("FETCH emp1_cur"))
+    {
       goto sql_err;
     }
-  
-    long cur_total = sqlca.sqlerrd[2];     /* cumulative rows processed */
-    int  got       = (int)(cur_total - prev_total);
-    prev_total     = cur_total;
 
+    long cur_total = sqlca.sqlerrd[2]; /* cumulative rows processed */
+    int got = (int)(cur_total - prev_total);
+    prev_total = cur_total;
+
+    XORA_ORA_BREAK_ON_NODATA();
     /* Use only up to requested batch_size this cycle. */
     int use = got < batch_size ? got : batch_size;
 
-    for (int i = 0; i < use && *out_count < cap; ++i) {
+    for (int i = 0; i < use && *out_count < cap; ++i)
+    {
       xora_emp_row_t *r = &rows[*out_count];
-      r->empno         = empno_arr[i];
-      r->salary           = sal_arr[i];
+      r->empno = empno_arr[i];
+      r->salary = sal_arr[i];
       r->ename_is_null = (ename_ind_arr[i] < 0);
-      xora_ut8_copy_bounded (r->ename, ename_arr[i], sizeof (r->ename));
+      xora_ut8_copy_bounded(r->ename, ename_arr[i], sizeof(r->ename));
       (*out_count)++;
     }
 
-    if (*out_count >= cap) break;          /* caller’s buffer filled */
-    if (got < XORA_MAX_BATCH) break;       /* fetch returned less than bound ⇒ likely done */
+    if (*out_count >= cap)
+      break; /* caller’s buffer filled */
+    if (got < 512)
+      break; /* fetch returned less than bound ⇒ likely done */
   }
 
-  EXEC SQL CLOSE emp_cur;
+  EXEC SQL CLOSE emp1_cur;
   return XORA_OK;
 
 sql_err:
   /* cleanup if needed, then bubble up */
   /* If cursor might still be open, try to close it: */
-  EXEC SQL CLOSE emp_cur;
+  EXEC SQL CLOSE emp1_cur;
   /* ignore close error here */
   return XORA_ERR;
-
 }

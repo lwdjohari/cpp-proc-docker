@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "stb_ds.h"
 #include "xora_error.h"
 #include "xora_alloc.h"
 #include "xora_contex.h"
@@ -23,6 +24,65 @@ static void usage(const char *prog)
             prog);
 }
 
+static int fetch_emp_arrst(xora_conn_t *conn, int cap, int batch)
+{
+    /* Allocate output buffer */
+    xora_emp_row_t *rows = XORA_ALLOC_ARRAY(xora_emp_row_t, cap);
+
+    int out_count = 0;
+
+    xora_err_t rc = xora_emp_fetch_arrst(conn, rows, cap, &out_count, batch);
+    if (rc != XORA_OK)
+    {
+        fprintf(stderr, "xora_emp_fetch failed (rc=%d)\n", rc);
+        xora_free(rows);
+        return 1;
+    }
+
+    /* Print results */
+    printf("%-6s  %-50s  %10s\n", "EMPNO", "ENAME", "SAL");
+    printf("------  --------------------------------------------------  ----------\n");
+    for (int i = 0; i < out_count; ++i)
+    {
+        printf("%-6d  %-50s  %10.2f\n", rows[i].empno, rows[i].ename, rows[i].salary);
+    }
+    printf("\n%d records(s)\n", out_count);
+
+    xora_free(rows);
+}
+
+static int fetch_emp_vect(xora_conn_t *conn)
+{
+    
+    
+    xora_emp_row_t *rows = NULL; // caller owns; starts empty
+
+    xora_err_t rc = xora_emp_fetch_vect(conn, &rows, 5000);
+    if (rc != XORA_OK)
+    {
+        fprintf(stderr, "xora_emp_vfetch failed (rc=%d)\n", rc);
+        arrfree(rows);
+        return 1;
+    }
+
+    int n = arrlen(rows);
+    /* Print results */
+    printf("%-6s  %-50s  %10s\n", "EMPNO", "ENAME", "SAL");
+    printf("------  --------------------------------------------------  ----------\n");
+
+    for (int i = 0; i < n; ++i)
+    {
+        const xora_emp_row_t *r = &rows[i];
+        // use r->empno, r->salary, r->ename, r->ename_is_null ...
+
+        printf("%-6d  %-50s  %10.2f\n", r->empno, r->ename, r->salary);
+    }
+    printf("\n%d records(s)\n", n);
+
+    arrfree(rows); // ALWAYS free when done
+    return XORA_OK;
+}
+
 int main(int argc, char **argv)
 {
     const char *user = (argc > 1) ? argv[1] : get_env_or("ORA_USER", "scott");
@@ -31,12 +91,12 @@ int main(int argc, char **argv)
 
     int ulen = user ? (int)strlen(user) : 0;
     int plen = pass ? (int)strlen(pass) : 0;
-    int dlen = db   ? (int)strlen(db)   : 0;
+    int dlen = db ? (int)strlen(db) : 0;
 
     fprintf(stderr, "ORA_USER: %.*s(%d) ORA_PASS: %.*s(%d) ORA_DB: %.*s(%d)\n",
-        ulen, user ? user : "", ulen,
-        plen, pass ? pass : "", plen,
-        dlen, db   ? db   : "", dlen);
+            ulen, user ? user : "", ulen,
+            plen, pass ? pass : "", plen,
+            dlen, db ? db : "", dlen);
 
     int cap = (argc > 4) ? atoi(argv[4]) : 64;
     int batch = (argc > 5) ? atoi(argv[5]) : 128;
@@ -63,31 +123,14 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    /* Allocate output buffer */
-    xora_emp_row_t *rows = XORA_ALLOC_ARRAY(xora_emp_row_t, cap);
+    printf("Vector Fetch\n\n");
+    fetch_emp_vect(conn);
+    printf("\n");
 
-    int out_count = 0;
+    printf("Static Array Fetch\n\n");
+    fetch_emp_arrst(conn, cap, batch);
+    printf("\n");
 
-    xora_err_t rc = xora_emp_fetch(conn, rows, cap, &out_count, batch);
-    if (rc != XORA_OK)
-    {
-        fprintf(stderr, "xora_emp_fetch failed (rc=%d)\n", rc);
-        xora_free(rows);
-        xora_conn_close(conn);
-        xora_conn_destroy(&conn);
-        return 1;
-    }
-
-    /* Print results */
-    printf("Fetched %d row(s):\n", out_count);
-    printf("%-6s  %-50s  %10s\n", "EMPNO", "ENAME", "SAL");
-    printf("------  --------------------------------------------------  ----------\n");
-    for (int i = 0; i < out_count; ++i)
-    {
-        printf("%-6d  %-50s  %10.2f\n", rows[i].empno, rows[i].ename, rows[i].salary);
-    }
-
-    xora_free(rows);
     xora_conn_close(conn);
     xora_conn_destroy(&conn);
 
