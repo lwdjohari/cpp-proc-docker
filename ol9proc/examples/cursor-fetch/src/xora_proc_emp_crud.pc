@@ -1,0 +1,336 @@
+#define SQLCA_STORAGE_CLASS extern
+EXEC SQL INCLUDE sqlca;
+
+#include "xora_proc_contex.h"
+#include "xora_proc_helper.h" 
+
+#include <stdlib.h>
+#include <string.h>
+#include <pthread.h>
+
+#include "xora_error.h"
+#include "xora_alloc.h"
+#include "xora_contex.h"
+
+#include "xora_proc_emp.h"
+#include "xora_proc_emp_crud.h"
+
+#define XORA_CONN_LOCK(h) pthread_mutex_lock(&(h)->mtx)
+#define XORA_CONN_UNLOCK(h) pthread_mutex_unlock(&(h)->mtx)
+
+xora_err_t xora_tx_commit(xora_conn_t *h)
+{
+    if (!h)
+        return XORA_ERR;
+
+    EXEC SQL BEGIN DECLARE SECTION;
+    sql_context lctx;
+    EXEC SQL END DECLARE SECTION;
+
+    lctx = h->ctx;
+    EXEC SQL CONTEXT USE : lctx;
+
+    EXEC SQL COMMIT WORK;
+    if (!XORA_ORA_OK("COMMIT"))
+        return XORA_ERR;
+
+    return XORA_OK;
+}
+
+xora_err_t xora_tx_rollback(xora_conn_t *h)
+{
+    if (!h)
+        return XORA_ERR;
+
+    EXEC SQL BEGIN DECLARE SECTION;
+    sql_context lctx;
+    EXEC SQL END DECLARE SECTION;
+
+    lctx = h->ctx;
+    EXEC SQL CONTEXT USE : lctx;
+
+    EXEC SQL ROLLBACK WORK;
+    if (!XORA_ORA_OK("ROLLBACK"))
+        return XORA_ERR;
+
+    return XORA_OK;
+}
+
+/*  Next id = MAX+1 (no locks here)  */
+xora_err_t xora_emp_next_id(xora_conn_t *h, int *out_empno)
+{
+    if (!h || !out_empno)
+        return XORA_ERR;
+
+    EXEC SQL BEGIN DECLARE SECTION;
+    sql_context lctx;
+    int v_max_id = 0;
+    EXEC SQL END DECLARE SECTION;
+
+    lctx = h->ctx;
+    EXEC SQL CONTEXT USE : lctx;
+
+    EXEC SQL SELECT NVL(MAX(id), 0)
+        INTO : v_max_id
+                   FROM employees;
+    if (!XORA_ORA_OK("SELECT MAX(id)"))
+        return XORA_ERR;
+
+    *out_empno = v_max_id + 1;
+    return XORA_OK;
+}
+
+/*  INSERT (auto id: MAX+1 + INSERT)  */
+static void xora__prep_ename(const xora_emp_row_t *in,
+                             char out_ename[52], short *out_ind)
+{
+    memset(out_ename, 0, 52);
+    if (in->ename_is_null)
+    {
+        *out_ind = -1;
+    }
+    else
+    {
+        *out_ind = 0;
+        size_t n = 51;
+        strncpy(out_ename, in->ename, n);
+        out_ename[n] = '\0';
+    }
+}
+
+xora_err_t xora_emp_create_autoid(xora_conn_t *h,
+                                  const xora_emp_row_t *in,
+                                  int *out_empno)
+{
+    if (!h || !in || !out_empno)
+        return XORA_ERR;
+
+    EXEC SQL BEGIN DECLARE SECTION;
+    sql_context lctx;
+    char v_ename[52];
+    short v_ename_ind = 0;
+    float v_sal = in->salary;
+    int v_new_id = 0;
+    int o_empno = 0;
+    EXEC SQL END DECLARE SECTION;
+
+    xora__prep_ename(in, v_ename, &v_ename_ind);
+
+    /* Compute id first (inside CRUD to avoid caller mistakes). */
+    if (xora_emp_next_id(h, &v_new_id) != XORA_OK)
+        return XORA_ERR;
+
+    lctx = h->ctx;
+    EXEC SQL CONTEXT USE : lctx;
+
+    EXEC SQL INSERT INTO employees(id, name, sal)
+        VALUES( : v_new_id, : v_ename INDICATOR : v_ename_ind, : v_sal)
+            RETURNING id INTO : o_empno;
+
+    if (!XORA_ORA_OK("INSERT employees (autoid)"))
+        return XORA_ERR;
+
+    *out_empno = o_empno;
+    return XORA_OK;
+}
+
+/*  INSERT (explicit id: caller supplies id)  */
+xora_err_t xora_emp_create_with_id(xora_conn_t *h,
+                                   const xora_emp_row_t *in,
+                                   int explicit_empno,
+                                   int *out_empno)
+{
+    if (!h || !in || !out_empno)
+        return XORA_ERR;
+
+    EXEC SQL BEGIN DECLARE SECTION;
+    sql_context lctx;
+    int v_empno = explicit_empno;
+    char v_ename[52];
+    short v_ename_ind = 0;
+    float v_sal = in->salary;
+    int o_empno = 0;
+    EXEC SQL END DECLARE SECTION;
+
+    xora__prep_ename(in, v_ename, &v_ename_ind);
+
+    lctx = h->ctx;
+    EXEC SQL CONTEXT USE : lctx;
+
+    EXEC SQL INSERT INTO employees(id, name, sal)
+        VALUES( : v_empno, : v_ename INDICATOR : v_ename_ind, : v_sal)
+            RETURNING id INTO : o_empno;
+
+    if (!XORA_ORA_OK("INSERT employees (with_id)"))
+        return XORA_ERR;
+
+    *out_empno = o_empno;
+    return XORA_OK;
+}
+
+/*  BATCH: MAX+1 + INSERT for each row (no commit, no locks)  */
+xora_err_t xora_emp_batch_create_autoid(xora_conn_t *h,
+                                        const xora_emp_row_t *rows,
+                                        int count)
+{
+    if (!h || !rows || count <= 0)
+        return XORA_ERR;
+
+    for (int i = 0; i < count; ++i)
+    {
+        int new_id = 0, out_id = 0;
+        if (xora_emp_next_id(h, &new_id) != XORA_OK)
+            return XORA_ERR;
+
+        xora_err_t rc = xora_emp_create_with_id(h, &rows[i], new_id, &out_id);
+        if (rc != XORA_OK)
+            return rc;
+    }
+    return XORA_OK;
+}
+
+/*  READ  */
+
+xora_err_t xora_emp_get_by_id(xora_conn_t *h,
+                              int empno,
+                              xora_emp_row_t *out,
+                              int *found)
+{
+    if (!h || !out || !found)
+        return XORA_ERR;
+    *found = 0;
+
+    EXEC SQL BEGIN DECLARE SECTION;
+    sql_context lctx;
+    int v_empno = empno;
+    int o_empno = 0;
+    char o_ename[52];
+    short o_ename_ind = 0;
+    float o_sal = 0.0f;
+    EXEC SQL END DECLARE SECTION;
+
+    memset(o_ename, 0, sizeof(o_ename));
+
+    lctx = h->ctx;
+    EXEC SQL CONTEXT USE : lctx;
+
+    EXEC SQL SELECT id, name, sal INTO : o_empno,
+        : o_ename INDICATOR : o_ename_ind,
+        : o_sal
+              FROM employees
+                  WHERE id = : v_empno;
+
+    if (sqlca.sqlcode == 1403 || sqlca.sqlcode == 100)
+    { /* NO DATA FOUND */
+        *found = 0;
+        return XORA_NO_DATA_FOUND;
+    }
+
+    if (!XORA_ORA_OK("SELECT employees by id"))
+        return XORA_ERR;
+
+    out->empno = o_empno;
+    out->salary = o_sal;
+    out->ename_is_null = (o_ename_ind < 0);
+    xora_ut8_copy_bounded(out->ename, o_ename, sizeof(out->ename));
+
+    *found = 1;
+    return XORA_OK;
+}
+
+/*  UPDATE  */
+xora_err_t xora_emp_update(xora_conn_t *h, const xora_emp_row_t *in)
+{
+    if (!h || !in)
+        return XORA_ERR;
+
+    EXEC SQL BEGIN DECLARE SECTION;
+    sql_context lctx;
+    int v_empno = in->empno;
+    char v_ename[52];
+    short v_ename_ind = 0;
+    float v_sal = in->salary;
+    EXEC SQL END DECLARE SECTION;
+
+    memset(v_ename, 0, sizeof(v_ename));
+    if (in->ename_is_null)
+    {
+        v_ename_ind = -1;
+    }
+    else
+    {
+        size_t n = sizeof(v_ename) - 1;
+        strncpy(v_ename, in->ename, n);
+        v_ename[n] = '\0';
+    }
+
+    lctx = h->ctx;
+    EXEC SQL CONTEXT USE : lctx;
+
+    EXEC SQL UPDATE employees
+        SET name = : v_ename INDICATOR : v_ename_ind,
+            sal = : v_sal
+                        WHERE id = : v_empno;
+    if (!XORA_ORA_OK("UPDATE employees"))
+        return XORA_ERR;
+
+    return XORA_OK;
+}
+
+/*  DELETE  */
+
+xora_err_t xora_emp_delete(xora_conn_t *h, int empno)
+{
+    if (!h)
+        return XORA_ERR;
+
+    EXEC SQL BEGIN DECLARE SECTION;
+    sql_context lctx;
+    int v_empno = empno;
+    EXEC SQL END DECLARE SECTION;
+
+    lctx = h->ctx;
+    EXEC SQL CONTEXT USE : lctx;
+
+    EXEC SQL DELETE FROM employees WHERE id = : v_empno;
+    if (!XORA_ORA_OK("DELETE employees"))
+        return XORA_ERR;
+
+    return XORA_OK;
+}
+
+xora_err_t xora_create_employee_with_lock(xora_conn_t *conn, xora_emp_row_t *row, int *empid)
+{
+
+    /* Caller enforces race safety explicitly */
+    EXEC SQL CONTEXT USE : conn->ctx;
+    EXEC SQL LOCK TABLE employees IN EXCLUSIVE MODE;
+
+    if (!XORA_ORA_OK("LOCK employees"))
+    {
+        goto sql_rollback;
+    }
+
+    /* Get next id under the lock */
+    int next_id = 0;
+    if (xora_emp_next_id(conn, &next_id) != XORA_OK)
+    {
+        goto sql_rollback;
+    }
+
+    if (xora_emp_create_with_id(conn, row, next_id, empid) != XORA_OK)
+    {
+        goto sql_rollback;
+    }
+
+    if (xora_tx_commit(conn) != XORA_OK)
+    {
+        goto sql_rollback;
+    }
+
+    return XORA_OK;
+    
+sql_rollback:
+    (void)xora_tx_rollback(conn);
+    return XORA_TX_ROLLBACK;
+}

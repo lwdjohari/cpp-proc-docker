@@ -5,9 +5,12 @@
 #include "stb_ds.h"
 #include "xora_error.h"
 #include "xora_alloc.h"
+#include "xora_alloc.h"
 #include "xora_contex.h"
 #include "xora_proc_emp.h"
 #include "xora_proc_emp_fetch.h"
+#include "xora_proc_emp_crud.h"
+
 
 static const char *get_env_or(const char *key, const char *defv)
 {
@@ -83,6 +86,27 @@ static int fetch_emp_vect(xora_conn_t *conn)
     return XORA_OK;
 }
 
+static int create_new_emp(xora_conn_t *conn,xora_emp_row_t *row){
+    if(!row){
+        printf("[Create] Err create new employee failed. \n"   );
+        return 1;
+    }
+
+    int empid = 0;
+    xora_err_t rc = xora_create_employee_with_lock(conn, row, &empid);
+    if(rc == XORA_TX_ROLLBACK ){
+        printf("[Create] Err create new employee with name %.*s failed & rollback.\n", strlen(row->ename),row->ename);
+        return 2;
+    }else if(rc != XORA_OK){
+        printf("[Create] Err create new employee with name %.*s error.\n", strlen(row->ename),row->ename );
+        return 3;
+    }
+
+    printf("[Create] Created new employee with name %.*s [%d].\n", strlen(row->ename),row->ename,  empid  );
+
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     const char *user = (argc > 1) ? argv[1] : get_env_or("ORA_USER", "scott");
@@ -123,13 +147,34 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    printf("Vector Fetch\n\n");
-    fetch_emp_vect(conn);
-    printf("\n");
-
     printf("Static Array Fetch\n\n");
     fetch_emp_arrst(conn, cap, batch);
     printf("\n");
+
+
+    xora_emp_row_t *new_emp = XORA_ALLOC_ARRAY(xora_emp_row_t, 2) ;
+
+    memset(&new_emp[0], 0, sizeof(xora_emp_row_t));   
+    XORA_STRSET(new_emp[0].ename,"Whitney");
+    new_emp[0].salary = 15000;
+        
+    memset(&new_emp[1], 0, sizeof(xora_emp_row_t));   
+    XORA_STRSET(new_emp[1].ename,"Sarah");
+    new_emp[1].salary = 17000;
+    
+
+    create_new_emp(conn,&new_emp[0]);
+    create_new_emp(conn,&new_emp[1]);
+
+    xora_free(new_emp);
+    new_emp = NULL;   
+
+    
+    printf("\n\nVector Fetch\n\n");
+    fetch_emp_vect(conn);
+    printf("\n");
+
+    
 
     xora_conn_close(conn);
     xora_conn_destroy(&conn);

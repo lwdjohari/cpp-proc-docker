@@ -62,43 +62,7 @@ extern "C"
 
   static inline long xora_ora_rows(void) { return sqlca.sqlerrd[2]; }
 
-  // /* ---- VARCHAR helpers ---- */
-
-  // static inline void xora_ut8_copy_bounded(char *dst, size_t cap, const char *src) {
-  //     if (!dst || cap == 0) return;
-  //     if (!src) { dst[0] = '\0'; return; }
-  //     size_t n = strnlen(src, cap - 1);
-  //     memcpy(dst, src, n);
-  //     dst[n] = '\0';
-  // }
-
-  /* Safety copy for fixed char[N] destinations */
-  static inline void xora_ut8_copy_bounded(char *dst, const char *src, size_t dst_size)
-  {
-    if (!dst || dst_size == 0)
-      return;
-    if (!src)
-    {
-      dst[0] = '\0';
-      return;
-    } // optional: guard NULL src
-    size_t i = 0;
-    for (; i + 1 < dst_size && src[i]; ++i)
-      dst[i] = src[i];
-    dst[i] = '\0';
-  }
-
-  static inline void xora_memcpy(char *dst, size_t dst_size, const char *src, size_t src_len)
-  {
-    if (!dst || dst_size == 0)
-      return;
-    size_t n = (src_len < (dst_size - 1)) ? src_len : (dst_size - 1);
-    if (src && n)
-      memcpy(dst, src, n);
-    dst[n] = '\0';
-    /* optional: zero-pad tail
-       if (n + 1 < dst_size) memset(dst + n + 1, 0, dst_size - (n + 1)); */
-  }
+  
 
   static inline void xora_varchar_set(VARCHAR *v, size_t cap, const char *s)
   {
