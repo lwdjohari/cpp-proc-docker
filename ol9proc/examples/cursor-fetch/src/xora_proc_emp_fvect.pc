@@ -62,7 +62,8 @@ xora_err_t xora_emp_fetch_vect(xora_conn_t *h,
 
   EXEC SQL DECLARE emp1_cur CURSOR FOR
       SELECT id,
-      name, sal FROM employees;
+      name, sal FROM employees
+      ORDER BY id;
 
   /* Host arrays MUST have compile-time size */
   EXEC SQL BEGIN DECLARE SECTION;
@@ -101,7 +102,7 @@ xora_err_t xora_emp_fetch_vect(xora_conn_t *h,
     /* Guard: if cumulative didn't increase, we're done */
     if (row_processed <= 0)
     {
-      printf("[pass-%d] row_processed=0 total=%ld (no progress → tail/EOF)\n\n",
+      printf("[pass-%d] row_processed=0 total=%ld (no progress -> tail/EOF)\n\n",
              pass, prev_fetch_total);
       break;
     }

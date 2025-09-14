@@ -62,7 +62,8 @@ xora_err_t xora_emp_fetch_arrst(xora_conn_t *h,
 
   EXEC SQL DECLARE emp1_cur CURSOR FOR
       SELECT id,
-      name, sal FROM scott.employees;
+      name, sal FROM scott.employees
+      ORDER BY id;
 
   /* Host arrays MUST have compile-time size */
   EXEC SQL BEGIN DECLARE SECTION;
