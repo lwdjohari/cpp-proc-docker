@@ -55,10 +55,7 @@ xora_err_t xora_conn_open(xora_conn_t *h)
 
     /* Copy from handle into local host vars */
     lctx = h->ctx;
-    // u = h->user;  /* struct assignment is fine */
-    // p = h->pass;
-    // d = h->db;
-
+    
     memcpy(&u, &h->user, sizeof(u));
     memcpy(&p, &h->pass, sizeof(p));
     memcpy(&d, &h->db,   sizeof(d));

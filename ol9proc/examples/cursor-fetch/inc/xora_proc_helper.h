@@ -5,7 +5,7 @@
 #include <string.h>
 #include <stddef.h>
 
-// #include <sqlca.h>
+
 
 #ifdef __cplusplus
 extern "C"

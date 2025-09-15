@@ -1,0 +1,97 @@
+/* src/xora_emp.pc */
+#include "xora_proc_contex.h"  /* struct xora_conn { sql_context ctx; VARCHAR user[64]; ... } */
+#include "xora_proc_helper.h"  /* xora_ora_ok, xora_utf8_set_varchar, etc. */
+
+#include "xora_error.h"
+#include "xora_alloc.h"
+#include "xora_context.h"
+#include "xora_proc_emp_fetch.h"
+
+
+xora_err_t xora_emp_scan(xora_conn_t *h,
+                         int fetch_array_size,
+                         xora_emp_row_cb on_row,
+                         void *user)
+{
+    if (!h || fetch_array_size <= 0)
+        return XORA_ERR;
+
+    /* Use this handle’s context in this thread */
+    EXEC SQL CONTEXT USE :h->ctx;
+
+    /* Clamp fetch size to a sane max */
+    EXEC SQL BEGIN DECLARE SECTION;
+    int v_arrsz = (fetch_array_size > 256) ? 256 : fetch_array_size;
+    EXEC SQL END DECLARE SECTION;
+
+    /* Declare the cursor over SCOTT.EMP (empno, ename) */
+    EXEC SQL DECLARE c_emp CURSOR FOR
+        SELECT 
+            empno, ename, salary 
+        FROM emp 
+        ORDER BY empno;
+
+    EXEC SQL OPEN c_emp;
+    if (!xora_ora_ok("open c_emp"))
+    {
+        EXEC SQL CLOSE c_emp;
+        return XORA_CONN_ERR;
+    }
+
+    /* Host arrays + indicators for array fetch */
+    EXEC SQL BEGIN DECLARE SECTION;
+    int hv_empno[256];
+    short ind_empno[256];
+
+    VARCHAR hv_ename[256][51];
+    short ind_ename[256];
+
+    
+    EXEC SQL END DECLARE SECTION;
+
+    long total = 0; /* cumulative rows processed according to sqlca */
+    for (;;)
+    {
+        EXEC SQL FOR :v_arrsz FETCH c_emp
+                           INTO :hv_empno :ind_empno,
+            :hv_ename :ind_ename;
+
+        /* Compute how many rows arrived in this batch (delta of cumulative) */
+        long new_total = sqlca.sqlerrd[2];
+        long batch = new_total - total;
+        if (batch < 0)
+            batch = 0; /* defensive */
+        total = new_total;
+
+        /* Dispatch rows in this batch */
+        for (long i = 0; i < batch; ++i)
+        {
+            if (ind_empno[i] == -1 || ind_ename[i] == -1)
+            {
+                /* skip NULLs (unlikely for EMP demo) */
+                continue;
+            }
+            if (on_row)
+            {
+                xora_emp_row_t row;
+                row.empno = hv_empno[i];
+                xora_varchar_to_cstr(&hv_ename[i], row.ename, sizeof row.ename);
+                on_row(&row, user);
+            }
+        }
+
+        /* End-of-data? break on NOT FOUND (SQLCODE 1403) */
+        XORA_ORA_BREAK_ON_NODATA();
+
+        /* Any hard error */
+        if (sqlca.sqlcode < 0)
+        {
+            xora_ora_ok("fetch c_emp"); /* surfaces error */
+            EXEC SQL CLOSE c_emp;
+            return XORA_CONN_ERR;
+        }
+    }
+
+    EXEC SQL CLOSE c_emp;
+    return XORA_OK;
+}

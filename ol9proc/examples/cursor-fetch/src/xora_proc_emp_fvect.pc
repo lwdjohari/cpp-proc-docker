@@ -16,7 +16,7 @@ EXEC SQL INCLUDE sqlca;
 #include "stb_ds.h"
 
 #include "xora_proc_contex.h"
-#include "xora_proc_helper.h" /
+#include "xora_proc_helper.h"
 
 #include <stdlib.h>
 #include <string.h>
