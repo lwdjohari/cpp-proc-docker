@@ -9,26 +9,22 @@
 #define SQLCA_STORAGE_CLASS extern
 EXEC SQL INCLUDE sqlca;
 
-/* Make Pro*C continue after errors/warnings so we can read sqlca */
-// EXEC SQL WHENEVER SQLERROR   CONTINUE;
-// EXEC SQL WHENEVER SQLWARNING CONTINUE;
-// EXEC SQL WHENEVER NOT FOUND  CONTINUE;
 
 // #define STB_DS_IMPLEMENTATION
 // #include "stb_ds.h"
 
 #include "xora_proc_contex.h"
-#include "xora_proc_helper.h" /* xora_ora_ok(...), xora_utf8_set_varchar(...) etc. */
+#include "xora_proc_helper.h" 
 
 #include <stdlib.h>
 #include <string.h>
 
-/* Your project headers (as per your earlier snippet) */
-#include "xora_error.h" /* xora_err_t, XORA_OK / XORA_ERR */
+
+#include "xora_error.h" 
 #include "xora_alloc.h"
 #include "xora_contex.h"
 
-#include "xora_proc_emp.h" /* xora_emp_row_t, prototypes */
+#include "xora_proc_emp.h" 
 #include "xora_proc_emp_fetch.h"
 
 #ifndef XORA_MAX_BATCH
@@ -113,17 +109,16 @@ xora_err_t xora_emp_fetch_arrst(xora_conn_t *h,
     }
 
     if (*out_count >= cap)
-      break; /* caller’s buffer filled */
+      break; 
     if (got < 512)
-      break; /* fetch returned less than bound ⇒ likely done */
+      break; 
   }
 
   EXEC SQL CLOSE emp1_cur;
   return XORA_OK;
 
 sql_err:
-  /* cleanup if needed, then bubble up */
-  /* If cursor might still be open, try to close it: */
+
   EXEC SQL CLOSE emp1_cur;
   /* ignore close error here */
   return XORA_ERR;

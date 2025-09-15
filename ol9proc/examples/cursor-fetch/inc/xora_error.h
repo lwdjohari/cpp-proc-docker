@@ -25,7 +25,8 @@ typedef enum XORA_ERR{
     XORA_ERR = 7,
     XORA_NO_DATA_FOUND = 8,
     XORA_LOCK_TABLE_FAILED = 9,
-    XORA_TX_ROLLBACK = 10
+    XORA_TX_ROLLBACK = 10,
+    XORA_TX_CREATE_ERR = 11
 }xora_err_t;
 
 

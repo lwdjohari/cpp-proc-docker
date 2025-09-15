@@ -24,6 +24,7 @@ include_directories(
 # ---- Explicit .pc sources (maintain this list) ----
 set(XORA_PC_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/xora_contex.pc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/xora_proc_tx.pc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/xora_proc_emp_fetch.pc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/xora_proc_emp_fvect.pc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/xora_proc_emp_crud.pc

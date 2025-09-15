@@ -12,49 +12,12 @@ EXEC SQL INCLUDE sqlca;
 #include "xora_alloc.h"
 #include "xora_contex.h"
 
+#include "xora_proc_tx.h"
 #include "xora_proc_emp.h"
 #include "xora_proc_emp_crud.h"
 
-#define XORA_CONN_LOCK(h) pthread_mutex_lock(&(h)->mtx)
-#define XORA_CONN_UNLOCK(h) pthread_mutex_unlock(&(h)->mtx)
 
-xora_err_t xora_tx_commit(xora_conn_t *h)
-{
-    if (!h)
-        return XORA_ERR;
 
-    EXEC SQL BEGIN DECLARE SECTION;
-    sql_context lctx;
-    EXEC SQL END DECLARE SECTION;
-
-    lctx = h->ctx;
-    EXEC SQL CONTEXT USE : lctx;
-
-    EXEC SQL COMMIT WORK;
-    if (!XORA_ORA_OK("COMMIT"))
-        return XORA_ERR;
-
-    return XORA_OK;
-}
-
-xora_err_t xora_tx_rollback(xora_conn_t *h)
-{
-    if (!h)
-        return XORA_ERR;
-
-    EXEC SQL BEGIN DECLARE SECTION;
-    sql_context lctx;
-    EXEC SQL END DECLARE SECTION;
-
-    lctx = h->ctx;
-    EXEC SQL CONTEXT USE : lctx;
-
-    EXEC SQL ROLLBACK WORK;
-    if (!XORA_ORA_OK("ROLLBACK"))
-        return XORA_ERR;
-
-    return XORA_OK;
-}
 
 /*  Next id = MAX+1 (no locks here)  */
 xora_err_t xora_emp_next_id(xora_conn_t *h, int *out_empno)
@@ -302,7 +265,11 @@ xora_err_t xora_emp_delete(xora_conn_t *h, int empno)
 xora_err_t xora_create_employee_with_lock(xora_conn_t *conn, xora_emp_row_t *row, int *empid)
 {
 
-    /* Caller enforces race safety explicitly */
+    int tx_rc = xora_tx_begin_rw(conn);
+    if(tx_rc!=0){
+        return XORA_TX_CREATE_ERR;
+    }
+
     EXEC SQL CONTEXT USE : conn->ctx;
     EXEC SQL LOCK TABLE employees IN EXCLUSIVE MODE;
 
