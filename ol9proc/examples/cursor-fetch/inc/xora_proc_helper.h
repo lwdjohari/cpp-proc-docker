@@ -1,10 +1,5 @@
 #ifndef XORA_PROC_HELPER_H
 #define XORA_PROC_HELPER_H
-/* xora_proc_helper.h — only for .pc files */
-
-// #ifndef XORA_PROC
-// # error "This header is Pro*C-only. Compile .pc with proc define=XORA_PROC"
-// #endif
 
 #include <stdio.h>
 #include <string.h>
@@ -17,7 +12,7 @@ extern "C"
 {
 #endif
 
-  /* ---- sqlca helpers (read-only) ---- */
+/*  sqlca helpers (read-only)  */
 
 #define XORA_ORA_BREAK_ON_NODATA()                     \
   do                                                   \
@@ -62,9 +57,7 @@ extern "C"
 
   static inline long xora_ora_rows(void) { return sqlca.sqlerrd[2]; }
 
-  
-
-  static inline void xora_varchar_set(VARCHAR *v, size_t cap, const char *s)
+    static inline void xora_varchar_set(VARCHAR *v, size_t cap, const char *s)
   {
     size_t n = s ? strlen(s) : 0;
     if (n > cap)
